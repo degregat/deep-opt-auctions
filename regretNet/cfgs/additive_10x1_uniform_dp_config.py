@@ -12,13 +12,13 @@ __C = edict()
 cfg = __C
 
 # Output-dir to write log-files and save model
-__C.dir_name = os.path.join("experiments", "unit_1x2_uniform_23")
+__C.base_dir = os.path.join("experiments", "additive_1x2_uniform")
 
 # Auction params
-__C.num_agents = 1
-__C.num_items = 2
-__C.distribution_type = "uniform_23"
-__C.agent_type = "unit_demand"
+__C.num_agents = 10
+__C.num_items = 1
+__C.distribution_type = "uniform"
+__C.agent_type = "additive"
 
 # Save data for restore.
 __C.save_data = False
@@ -45,7 +45,7 @@ __C.train.seed = 42
 # training form restore_iter [needs saved model]
 __C.train.restore_iter = 0
 # max iters to train 
-__C.train.max_iter = 400000
+__C.train.max_iter = 4000
 # Learning rate of network param updates
 __C.train.learning_rate = 1e-3
 # Regularization
@@ -58,6 +58,16 @@ __C.train.data = "fixed"
 __C.train.num_batches = 5000
 # Train batch size
 __C.train.batch_size = 128
+
+# Parameters for differentially private optimizers
+# Number of microbatches (if None, default to size of minibatch)
+__C.train.microbatches = None
+# Noise muliplier
+__C.train.noise_multiplier = 1.0
+# Norm clip
+__C.train.l2_norm_clip = 10.0
+# Delta (should be less than inverse of population size (num_agents))
+__C.train.delta = 0.1
 
 
 """ Train-misreport params """
@@ -78,30 +88,31 @@ __C.train.w_rgt_init_val = 5.0
 # Lagrange update frequency
 __C.train.update_frequency = 100
 # Value by which update rate is incremented
-__C.train.up_op_add = 20.0
+__C.train.up_op_add = 50.0
 # Frequency at which update rate is incremented
-__C.train.up_op_frequency = 10000
+__C.train.up_op_frequency = 1000
 
 
 """ train summary and save params"""
 # Number of models to store on disk
-__C.train.max_to_keep = 10
-# Frequency at which models are saved
-__C.train.save_iter = 50000 
+__C.train.max_to_keep = 25
+# Frequency at which models are saved-
+__C.train.save_iter = 2000
 # Train stats print frequency
 __C.train.print_iter = 1000
-   
+# Privacy print frequency
+__C.train.print_privacy_iter = 1000
 
 """ Validation params """
 __C.val = edict()
 # Number of steps for misreport computation
-__C.val.gd_iter = 2000
+__C.val.gd_iter = 200
 # Learning rate for misreport computation
 __C.val.gd_lr = 0.1
 # Number of validation batches
 __C.val.num_batches = 20
 # Frequency at which validation is performed
-__C.val.print_iter = 10000
+__C.val.print_iter = 1000
 # Validation data frequency
 __C.val.data = "fixed"
 
@@ -111,7 +122,7 @@ __C.test = edict()
 # Test Seed
 __C.test.seed = 100
 # Model to be evaluated
-__C.test.restore_iter = 400000
+__C.test.restore_iter = 4000
 # Number of misreports
 __C.test.num_misreports = 1000
 # Number of steps for misreport computation
@@ -121,7 +132,7 @@ __C.test.gd_lr = 0.1
 # Test data
 __C.test.data = "online"
 # Number of test batches
-__C.test.num_batches = 100
+__C.test.num_batches = 10
 # Test batch size
 __C.test.batch_size = 100
 # Save Ouput

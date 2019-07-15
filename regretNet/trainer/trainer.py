@@ -7,6 +7,7 @@ import sys
 import time
 import logging
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 
 from privacy.analysis import privacy_ledger
@@ -22,10 +23,18 @@ except:  # pylint: disable=bare-except
 
 class Trainer(object):
 
-    def __init__(self, config, mode, net, clip_op_lambda):
+    def __init__(self, config, mode, net, clip_op_lambda, noise=None, clip=None):
         self.config = config
         self.mode = mode
 
+        self.noise = noise
+        self.clip = clip
+
+        if (self.noise, self.clip) != (None, None):
+          self.config.dir_name = self.config.base_dir + '_noise_' + str(noise) + '_clip_' + str(clip)
+        else:
+          self.config.dir_name = self.config.base_dir
+          
         # Create output-dir
         if not os.path.exists(self.config.dir_name): os.mkdir(self.config.dir_name)
 
@@ -42,7 +51,7 @@ class Trainer(object):
 
         # Init Logger
         self.init_logger()
-
+         
         # Init Net
         self.net = net
 
@@ -52,10 +61,10 @@ class Trainer(object):
         # Init TF-graph
         self.init_graph()
 
-    def __gen_ledger(self, pop_size):
+    def __gen_ledger(self, pop_size, batch_size):
       ledger = privacy_ledger.PrivacyLedger(
         population_size = pop_size,
-        selection_probability = (self.batch_size / pop_size))
+        selection_probability = (batch_size / pop_size))
       return(ledger)
 
     def calc_priv(self, sess):
@@ -148,14 +157,16 @@ class Trainer(object):
         with tf.variable_scope('adv_var'):
             self.adv_var = tf.get_variable('adv_var', shape = adv_var_shape, dtype = tf.float32)
 
-        # Initialize parameters for dp_optimizers
-        self.noise_multiplier = self.config.train.noise_multiplier
-        self.l2_norm_clip = self.config.train.l2_norm_clip
-        self.batch_size = self.config[self.mode].batch_size
-        self.microbatches = self.config.train.microbatches
-        self.delta = self.config.train.delta
-        self.model_dir =  None
-        self.pop_size = self.config.num_agents
+
+        if (self.noise, self.clip) != (None, None):
+          # Initialize parameters for dp_optimizers
+          self.noise_multiplier = self.noise #self.config.train.noise_multiplier
+          self.l2_norm_clip = self.clip #self.config.train.l2_norm_clip
+          self.batch_size = self.config[self.mode].batch_size
+          self.microbatches = self.config.train.microbatches
+          self.delta = self.config.train.delta
+          self.model_dir =  None
+          self.pop_size = self.config.num_agents
 
         # Misreports
         x_mis, self.misreports = self.get_misreports(self.x, self.adv_var, adv_shape)
@@ -201,17 +212,18 @@ class Trainer(object):
             # Loss Functions
             rgt_penalty = update_rate * tf.reduce_sum(tf.square(rgt)) / 2.0
             lag_loss = tf.reduce_sum(self.w_rgt * rgt)
-            
+
             loss_1 = -revenue + rgt_penalty + lag_loss
             loss_2 = -tf.reduce_sum(u_mis)
             loss_3 = -lag_loss
 
-            if self.microbatches == None:
-              vec_len = 1
-            else:
-              vec_len = self.microbatches
-            
-            loss_3_vec = [ loss_3 for i in range(0, vec_len) ]
+            if (self.noise, self.clip) != (None, None):
+              if self.microbatches == None:
+                vec_len = 1
+              else:
+                vec_len = self.microbatches
+                
+              loss_3_vec = [ loss_3 for i in range(0, vec_len) ]
 
             reg_losses = tf.get_collection('reg_losses')
             if len(reg_losses) > 0:
@@ -225,19 +237,32 @@ class Trainer(object):
             opt_1 = tf.train.AdamOptimizer(learning_rate)
             opt_2 = tf.train.AdamOptimizer(self.config.train.gd_lr)
 
-            self.opt_3_ledger = self.__gen_ledger(self.pop_size)
-            opt_3 = dp_optimizer.DPGradientDescentGaussianOptimizer(
+
+            if (self.noise, self.clip) != (None, None):
+              self.opt_3_ledger = self.__gen_ledger(self.pop_size, 1)
+              # TODO: Do we need the Gaussian version here?
+              opt_3 = dp_optimizer.DPGradientDescentGaussianOptimizer(
                 l2_norm_clip=self.l2_norm_clip,
                 noise_multiplier=self.noise_multiplier,
                 num_microbatches=self.microbatches,
                 ledger=self.opt_3_ledger,
                 learning_rate=update_rate)
 
-            # Train ops
+            else:
+              opt_3 = tf.train.GradientDescentOptimizer(update_rate)
+              
+            #  ops
             self.train_op = opt_1.minimize(loss_1, var_list = var_list)
             self.train_mis_step = opt_2.minimize(loss_2, var_list = [self.adv_var])
-            self.lagrange_update = opt_3.minimize(loss_3_vec, var_list = [self.w_rgt])
 
+            if (self.noise, self.clip) != (None, None):
+              self.lagrange_update = opt_3.minimize(loss_3_vec, var_list = [self.w_rgt])
+            else:
+              self.lagrange_update = opt_3.minimize(loss_3, var_list = [self.w_rgt])
+
+            print("w_rgt: ")
+            print(self.w_rgt)
+            
             # Val ops
             val_mis_opt = tf.train.AdamOptimizer(self.config.val.gd_lr)
             self.val_mis_step = val_mis_opt.minimize(loss_2, var_list = [self.adv_var])
@@ -249,7 +274,7 @@ class Trainer(object):
             # Metrics
             self.metrics = [revenue, rgt_mean, rgt_penalty, lag_loss, loss_1, tf.reduce_mean(self.w_rgt), update_rate]
             self.metric_names = ["Revenue", "Regret", "Reg_Loss", "Lag_Loss", "Net_Loss", "w_rgt_mean", "update_rate"]
-
+            
             #Summary
             tf.summary.scalar('revenue', revenue)
             tf.summary.scalar('regret', rgt_mean)
@@ -261,6 +286,11 @@ class Trainer(object):
 
             self.merged = tf.summary.merge_all()
             self.saver = tf.train.Saver(max_to_keep = self.config.train.max_to_keep)
+
+            #Save data
+            
+            self.data_columns = ["Iter", "Noise", "Clip", "Priv_Calc_Time", "Epsilon", "Train_Time"] + self.metric_names
+            self.data_array = []
 
         elif self.mode is "test":
 
@@ -284,7 +314,6 @@ class Trainer(object):
         """
         Runs training
         """
-
         self.train_gen, self.val_gen = generator
 
         iter = self.config.train.restore_iter
@@ -354,13 +383,25 @@ class Trainer(object):
                 log_str = "TRAIN-BATCH Iter: %d, t = %.4f"%(iter, time_elapsed) + ", %s: %.6f"*len(self.metric_names)%fmt_vals
                 self.logger.info(log_str)
 
-            if (iter % self.config.train.print_privacy_iter) == 0:
-                eps, priv_time = self.calc_priv(sess)
-                priv_str = 'The current epsilon is: %.2f' % eps
-                time_str = 'Time to calculate privacy: %.2f' % priv_time
-                self.logger.info(priv_str)
-                self.logger.info(time_str)
+                if (self.noise, self.clip) != (None,None):
+                  eps, priv_time = self.calc_priv(sess)
+                  priv_str = "epsilon: %.2f, calculation time: %.2f, noise: %.5f, clip: %.5f"%(eps, priv_time, self.noise, self.clip)
+                  self.logger.info(priv_str)
+                  data_row = [iter, self.noise, self.clip, priv_time, eps, time_elapsed] + metric_vals
 
+                else:
+                  data_row = [iter, None, None, None, None, time_elapsed] + metric_vals
+
+                self.data_array.append(data_row)
+                pd.DataFrame(self.data_array, columns=self.data_columns).to_csv(os.path.join(self.config.dir_name,'data.csv'))
+
+                                             
+           # if (iter % self.config.train.print_privacy_iter) == 0:
+           #     eps, priv_time = self.calc_priv(sess)
+           #     priv_str = 'epsilon: %.2f, calculation time: %.2f, noise: %.5f, clip: %.5f'
+           #                 % (eps, priv_time, self.noise, self.clip)
+           #     self.logger.info(priv_str)
+                            
             if (iter % self.config.val.print_iter) == 0:
                 #Validation Set Stats
                 metric_tot = np.zeros(len(self.metric_names))
