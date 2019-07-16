@@ -23,15 +23,20 @@ except:  # pylint: disable=bare-except
 
 class Trainer(object):
 
-    def __init__(self, config, mode, net, clip_op_lambda, noise=None, clip=None):
+    def __init__(self, config, mode, net, clip_op_lambda, noise=None, clip=None, run=None):
         self.config = config
         self.mode = mode
 
         self.noise = noise
         self.clip = clip
+        self.run = run
 
-        if (self.noise, self.clip) != (None, None):
+        if (self.noise, self.clip, self.run) != (None, None, None):
+          self.config.dir_name = self.config.base_dir + '_noise_' + str(noise) + '_clip_' + str(clip) + '_run_' + str(run)
+        elif (self.noise, self.clip) != (None, None):
           self.config.dir_name = self.config.base_dir + '_noise_' + str(noise) + '_clip_' + str(clip)
+        elif self.run != None:
+          self.config.dir_name = self.config.base_dir + '_run_' + str(run)
         else:
           self.config.dir_name = self.config.base_dir
           
