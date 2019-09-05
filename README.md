@@ -1,3 +1,32 @@
+# Differentially Private Approximately Optimal Auctions through Deep Learning
+Fork of [Optimal Auctions through Deep Learning](https://github.com/saisrivatsan/deep-opt-auctions) (https://arxiv.org/pdf/1706.03459.pdf), using [TensorFlow Privacy](https://github.com/tensorflow/privacy/) to make the RegretNet approach Differentially Private, resulting in Approximate Truthfulness and Collusion Resistance in the sense of “Mechanism Design via Differential Privacy" (Frank McSherry and Kunal Talwar, In FOCS, pages 94–103, 2007). This means we can relax the assumption of having prior knowledge of the valuation profiles.
+
+The outer loop of the lagrange optimizer (see Section 4 of the [paper on "Optimal Auctions through Deep Learning"](https://arxiv.org/pdf/1706.03459.pdf)) in this fork is differentially private, bounding the rate of change of the lagrange multipliers on the regret per agent. Therefore, the influence each agent has on the resulting allocation and payment functions is bounded.
+
+## Getting Started
+
+- Install Python 2.7
+- clone this repository and `cd` into it
+- run `pip2 install -r requirements.txt`
+
+## Running the experiments
+
+### RegretNet
+
+in `deep-opt-auctions/regretNet` execute `./run_batch.py`
+
+Supported settings so far are `additive_1x2_uniform` and `additive_5x10_uniform`. Modifying other configs is straightforward (see:  "Parameters for differentially private optimizer" in `deep-opt-auctions/regretNet/cfgs/additive_1x2_uniform_config.py`)
+
+
+Example:
+`./run_batch.py --setting additive_5x10_uniform --noise-vals 1.1 1.2 1.3 --clip-vals 1 1.5 2 --add-no-dp-run --iterations 100000 --description example_1`
+
+This will create `additive_5x10_uniform_batch_1` in `batch_experiments`, which contains `visualize_additive_5x10_uniform_batch_1.ipynb` displaying the results of the runs. The final model, data logs and the visualization will be commited to the branch `exp_example_1`. If you give a description, it should be unique. If you dont pick one, the branch will be called the same as the directory of the batch. To examine the results, switch to the branch after the run has finished.
+
+Note:
+Because of the branching during experiments, it is not advisable to run the experiments in your development repository, or to run multiple batches in parallel. Use multiple copies of the repository instead. If you want to use a single repository and do without versioning of the experiments, comment out `commit_code()` and `commit_data()` in `run_batch.py`. (Later versions might use an experiment framework to alleviate this.)
+
+
 # Optimal Auctions through Deep Learning
 Implementation of "Optimal Auctions through Deep Learning" (https://arxiv.org/pdf/1706.03459.pdf)
 
