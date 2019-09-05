@@ -9,6 +9,16 @@ import logging
 import numpy as np
 import tensorflow as tf
 
+from privacy.analysis import privacy_ledger
+from privacy.analysis.rdp_accountant import compute_rdp_from_ledger
+from privacy.analysis.rdp_accountant import get_privacy_spent
+from privacy.optimizers import dp_optimizer
+
+# Compatibility with tf 1 and 2 APIs
+try:
+  GradientDescentOptimizer = tf.compat.v1.train.GradientDescentOptimizer
+except:  # pylint: disable=bare-except
+  GradientDescentOptimizer = tf.optimizers.SGD  # pylint: disable=invalid-name
 
 class Trainer(object):
 
@@ -41,6 +51,26 @@ class Trainer(object):
 
         # Init TF-graph
         self.init_graph()
+
+    def __gen_ledger(self, pop_size):
+      ledger = privacy_ledger.PrivacyLedger(
+        population_size = pop_size,
+        selection_probability = (self.batch_size / pop_size))
+      return(ledger)
+
+    def calc_priv(self, sess):
+      tic = time.time()
+      orders = [1 + x / 10. for x in range(1, 100)] + list(range(12, 64))
+      _samples, _queries = self.opt_3_ledger.get_unformatted_ledger()
+      samples = sess.run(_samples)
+      queries = sess.run(_queries)
+      formatted_ledger = privacy_ledger.format_ledger(samples, queries)
+      rdp = compute_rdp_from_ledger(formatted_ledger, orders)
+      epsilon = get_privacy_spent(orders, rdp, target_delta=self.delta)[0]
+      toc = time.time()
+      priv_time = (toc-tic)
+      return(epsilon, priv_time)
+
 
     def get_clip_op(self, adv_var):
         self.clip_op =  self.clip_op_lambda(adv_var)
@@ -118,6 +148,14 @@ class Trainer(object):
         with tf.variable_scope('adv_var'):
             self.adv_var = tf.get_variable('adv_var', shape = adv_var_shape, dtype = tf.float32)
 
+        # Initialize parameters for dp_optimizers
+        self.noise_multiplier = self.config.train.noise_multiplier
+        self.l2_norm_clip = self.config.train.l2_norm_clip
+        self.batch_size = self.config[self.mode].batch_size
+        self.microbatches = self.config.train.microbatches
+        self.delta = self.config.train.delta
+        self.model_dir =  None
+        self.pop_size = self.config.num_agents
 
         # Misreports
         x_mis, self.misreports = self.get_misreports(self.x, self.adv_var, adv_shape)
@@ -163,11 +201,17 @@ class Trainer(object):
             # Loss Functions
             rgt_penalty = update_rate * tf.reduce_sum(tf.square(rgt)) / 2.0
             lag_loss = tf.reduce_sum(self.w_rgt * rgt)
-
-
+            
             loss_1 = -revenue + rgt_penalty + lag_loss
             loss_2 = -tf.reduce_sum(u_mis)
             loss_3 = -lag_loss
+
+            if self.microbatches == None:
+              vec_len = 1
+            else:
+              vec_len = self.microbatches
+            
+            loss_3_vec = [ loss_3 for i in range(0, vec_len) ]
 
             reg_losses = tf.get_collection('reg_losses')
             if len(reg_losses) > 0:
@@ -180,13 +224,19 @@ class Trainer(object):
             # Optimizer
             opt_1 = tf.train.AdamOptimizer(learning_rate)
             opt_2 = tf.train.AdamOptimizer(self.config.train.gd_lr)
-            opt_3 = tf.train.GradientDescentOptimizer(update_rate)
 
+            self.opt_3_ledger = self.__gen_ledger(self.pop_size)
+            opt_3 = dp_optimizer.DPGradientDescentGaussianOptimizer(
+                l2_norm_clip=self.l2_norm_clip,
+                noise_multiplier=self.noise_multiplier,
+                num_microbatches=self.microbatches,
+                ledger=self.opt_3_ledger,
+                learning_rate=update_rate)
 
             # Train ops
-            self.train_op  = opt_1.minimize(loss_1, var_list = var_list)
+            self.train_op = opt_1.minimize(loss_1, var_list = var_list)
             self.train_mis_step = opt_2.minimize(loss_2, var_list = [self.adv_var])
-            self.lagrange_update    = opt_3.minimize(loss_3, var_list = [self.w_rgt])
+            self.lagrange_update = opt_3.minimize(loss_3_vec, var_list = [self.w_rgt])
 
             # Val ops
             val_mis_opt = tf.train.AdamOptimizer(self.config.val.gd_lr)
@@ -303,6 +353,13 @@ class Trainer(object):
                 fmt_vals = tuple([ item for tup in zip(self.metric_names, metric_vals) for item in tup ])
                 log_str = "TRAIN-BATCH Iter: %d, t = %.4f"%(iter, time_elapsed) + ", %s: %.6f"*len(self.metric_names)%fmt_vals
                 self.logger.info(log_str)
+
+            if (iter % self.config.train.print_privacy_iter) == 0:
+                eps, priv_time = self.calc_priv(sess)
+                priv_str = 'The current epsilon is: %.2f' % eps
+                time_str = 'Time to calculate privacy: %.2f' % priv_time
+                self.logger.info(priv_str)
+                self.logger.info(time_str)
 
             if (iter % self.config.val.print_iter) == 0:
                 #Validation Set Stats

@@ -59,6 +59,19 @@ __C.train.num_batches = 5000
 # Train batch size
 __C.train.batch_size = 128
 
+""" Differential Privacy params """
+# Number of microbatches (if None, default to size of minibatch)
+__C.train.microbatches = None
+# Noise muliplier
+__C.train.noise_multiplier = 1.0
+# Norm clip
+__C.train.l2_norm_clip = 10.0
+# Delta (should be less than inverse of population size)
+__C.train.delta = 0.001
+# Population size
+__C.train.pop_size = __C.num_agents
+# Batch size for the dp optimizer (outer loop of lagrange optimizer)
+__C.train.dp_batch_size = 1
 
 """ Train-misreport params """
 # Cache-misreports after misreport optimization

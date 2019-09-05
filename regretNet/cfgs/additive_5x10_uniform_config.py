@@ -1,10 +1,8 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+#from __future__ import absolute_import
+#from __future__ import division
+#from __future__ import print_function
 
 import os
-import os.path as osp
-import numpy as np
 # `pip install easydict` if you don't have it
 from easydict import EasyDict as edict
 
@@ -12,7 +10,7 @@ __C = edict()
 cfg = __C
 
 # Output-dir to write log-files and save model
-__C.dir_name = os.path.join("experiments", "additive_5x10_uniform")
+__C.base_dir = os.path.join("experiments", "additive_5x10_uniform")
 
 # Auction params
 __C.num_agents = 5
@@ -38,8 +36,9 @@ __C.net.num_a_hidden_units = 100
 
 # Train paramters
 __C.train = edict()
-__C.train.seed = 42 # Random seed
 
+# Random seed
+__C.train.seed = 42
 # Iter from which training begins. If restore_iter = 0 for default. restore_iter > 0 for starting
 # training form restore_iter [needs saved model]
 __C.train.restore_iter = 0
@@ -58,6 +57,19 @@ __C.train.num_batches = 5000
 # Train batch size
 __C.train.batch_size = 128
 
+""" Differential Privacy params """
+# Number of microbatches (if None, default to size of minibatch)
+__C.train.microbatches = None
+# Noise muliplier
+__C.train.noise_multiplier = 1.0
+# Norm clip
+__C.train.l2_norm_clip = 10.0
+# Delta (should be less than inverse of population size)
+__C.train.delta = 0.001
+# Population size
+__C.train.pop_size = __C.num_agents
+# Batch size for the dp optimizer (outer loop of lagrange optimizer)
+__C.train.dp_batch_size = 1
 
 """ Train-misreport params """
 # Cache-misreports after misreport optimization
@@ -89,7 +101,8 @@ __C.train.max_to_keep = 10
 __C.train.save_iter = 50000 
 # Train stats print frequency
 __C.train.print_iter = 1000
-   
+# Privacy print frequency
+__C.train.print_privacy_iter = 1000
 
 """ Validation params """
 __C.val = edict()
