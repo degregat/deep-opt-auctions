@@ -1,6 +1,6 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
+
+
 
 import os
 import sys
@@ -218,7 +218,7 @@ class Trainer(object):
             metric_vals = sess.run(self.metrics, feed_dict = {self.x: X})          
             if self.config.test.save_output:
                 A, P = sess.run([self.alloc, self.pay], feed_dict = {self.x:X})
-                perm =range(i * A.shape[0], (i + 1) * A.shape[0])
+                perm =list(range(i * A.shape[0], (i + 1) * A.shape[0]))
                 alloc_tst[perm, :] = A
                 pay_tst[perm] = P
                     

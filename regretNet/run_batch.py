@@ -341,13 +341,13 @@ class Batch():
             self.visualize()
             self.commit_batch()
 
-        except StandardError as e:
+        except Exception as e:
             self.git.checkout(self.former_branch)
-            print e
+            print(e)
 
         except KeyboardInterrupt as e:
             self.git.checkout(self.former_branch)
-            print e
+            print(e)
 
         except Warning:
             pass
