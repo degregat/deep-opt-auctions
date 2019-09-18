@@ -1,0 +1,25 @@
+Commit:
+https://github.com/saisrivatsan/deep-opt-auctions/commit/288e14a08a3a63ad3b7d23a9130c541495c0d3c3
+Output of run_test.py with additive_1x2_uniform_config.py and
+
+__C.test.num_misreports = 1
+__C.test.gd_iter = 1
+__C.test.restore_iter = {20000, 40000, 60000, 80000, 100000}
+
+Output:
+2019-09-18 13:38:13,399:INFO:TEST ALL-20000: t = 0.2199, Revenue: 0.577364, Regret: 0.000237, IRP: 0.000000
+2019-09-18 13:38:24,812:INFO:TEST ALL-40000: t = 0.2215, Revenue: 0.571447, Regret: 0.000094, IRP: 0.000000
+2019-09-18 13:38:35,693:INFO:TEST ALL-60000: t = 0.2172, Revenue: 0.568533, Regret: 0.000057, IRP: 0.000000
+2019-09-18 13:38:46,225:INFO:TEST ALL-80000: t = 0.2135, Revenue: 0.562293, Regret: 0.000031, IRP: 0.000000
+2019-09-18 13:38:56,821:INFO:TEST ALL-100000: t = 0.2208, Revenue: 0.560616, Regret: 0.000018, IRP: 0.000000
+
+
+Commit: https://github.com/degregat/deep-opt-auctions/commit/e310072d3ed3f2e8de5dd248bbdf2997cd4e2508
+Output of run_batch.py, of the run without DP
+
+Output:
+2019-09-09 16:14:11,139:INFO:TEST ALL-20000: t = 0.1202, Revenue: 0.577935, Regret: 0.000096, IRP: 0.000000
+2019-09-09 16:14:25,287:INFO:TEST ALL-40000: t = 0.1197, Revenue: 0.571248, Regret: 0.000046, IRP: 0.000000
+2019-09-09 16:14:38,871:INFO:TEST ALL-60000: t = 0.1198, Revenue: 0.566920, Regret: 0.000020, IRP: 0.000000
+2019-09-09 16:14:53,504:INFO:TEST ALL-80000: t = 0.1158, Revenue: 0.561528, Regret: 0.000019, IRP: 0.000000
+2019-09-09 16:15:07,668:INFO:TEST ALL-100000: t = 0.1131, Revenue: 0.563204, Regret: 0.000014, IRP: 0.000000
