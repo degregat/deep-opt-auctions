@@ -1,0 +1,18 @@
+Commit: https://github.com/saisrivatsan/deep-opt-auctions/commit/288e14a08a3a63ad3b7d23a9130c541495c0d3c3
+Output of run_test.py with additive_5x10_uniform_config.py and
+
+__C.test.num_misreports = 1
+__C.test.gd_iter = 1
+__C.test.restore_iter = {50000, 100000}
+
+Output:
+2019-09-18 14:28:36,993:INFO:TEST ALL-50000: t = 0.6285, Revenue: 6.951401, Regret: 0.000041, IRP: 0.000000
+2019-09-18 14:28:51,619:INFO:TEST ALL-100000: t = 0.6320, Revenue: 6.940782, Regret: 0.000020, IRP: 0.000000
+
+
+Commit: https://github.com/degregat/deep-opt-auctions/commit/e310072d3ed3f2e8de5dd248bbdf2997cd4e2508
+Output of run_batch.py, of the run without DP
+
+Output:
+2019-09-13 03:11:59,546:INFO:TEST ALL-50000: t = 0.3821, Revenue: 7.130877, Regret: 0.000021, IRP: 0.000000
+2019-09-13 03:13:05,827:INFO:TEST ALL-100000: t = 0.3867, Revenue: 7.073095, Regret: 0.000010, IRP: 0.000000
