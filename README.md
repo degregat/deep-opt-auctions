@@ -26,6 +26,11 @@ This will create `additive_5x10_uniform_batch_1` in `batch_experiments`, which c
 Note:
 Because of the branching during experiments, it is not advisable to run the experiments in your development repository, or to run multiple batches in parallel. Use multiple copies of the repository instead. If you want to use a single repository and do without versioning of the experiments, comment out `commit_code()` and `commit_data()` in `run_batch.py`. (Later versions might use an experiment framework to alleviate this.)
 
+#### Examples
+
+Here you can see annotated example notebooks of the settings: 
+- [additive_1x2_uniform](https://github.com/degregat/deep-opt-auctions/blob/exp_comparison_dp_no_dp_additive_1x2_uniform/regretNet/batch_experiments/additive_1x2_uniform_batch_1/visualize_additive_1x2_uniform_batch_1.ipynb) 
+- [additive_5x10_uniform](https://github.com/degregat/deep-opt-auctions/blob/exp_comparison_dp_no_dp_additive_5x10_uniform/regretNet/batch_experiments/additive_5x10_uniform_batch_1/visualize_additive_5x10_uniform_batch_1.ipynb) 
 
 # Optimal Auctions through Deep Learning
 Implementation of "Optimal Auctions through Deep Learning" (https://arxiv.org/pdf/1706.03459.pdf)
