@@ -1,8 +1,6 @@
-#from __future__ import absolute_import
-#from __future__ import division
-#from __future__ import print_function
-
 import os
+import os.path as osp
+import numpy as np
 # `pip install easydict` if you don't have it
 from easydict import EasyDict as edict
 
@@ -10,13 +8,18 @@ __C = edict()
 cfg = __C
 
 # Output-dir to write log-files and save model
-__C.base_dir = os.path.join("experiments", "additive_5x10_uniform")
+__C.dir_name = os.path.join("experiments", "additive_5x10_uniform")
 
 # Auction params
 __C.num_agents = 5
 __C.num_items = 10
 __C.distribution_type = "uniform"
 __C.agent_type = "additive"
+
+# MPC
+__C.mpc = True
+# TODO: Add DP flag (requires changes to trainer)
+
 
 # Save data for restore.
 __C.save_data = False
@@ -61,9 +64,9 @@ __C.train.batch_size = 128
 # Number of microbatches (if None, default to size of minibatch)
 __C.train.microbatches = None
 # Noise muliplier
-__C.train.noise_multiplier = 1.0
+__C.train.noise_multiplier = None
 # Norm clip
-__C.train.l2_norm_clip = 10.0
+__C.train.l2_norm_clip = None
 # Delta (should be less than inverse of population size)
 __C.train.delta = 0.001
 # Population size

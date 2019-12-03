@@ -1,7 +1,3 @@
-
-
-
-
 import os
 import os.path as osp
 import numpy as np
@@ -19,6 +15,9 @@ __C.num_agents = 1
 __C.num_items = 2
 __C.distribution_type = "uniform"
 __C.agent_type = "additive"
+
+# MPC
+__C.mpc = True
 
 # Save data for restore.
 __C.save_data = False
@@ -63,9 +62,9 @@ __C.train.batch_size = 128
 # Number of microbatches (if None, default to size of minibatch)
 __C.train.microbatches = None
 # Noise muliplier
-__C.train.noise_multiplier = 1.0
+__C.train.noise_multiplier = None
 # Norm clip
-__C.train.l2_norm_clip = 10.0
+__C.train.l2_norm_clip = None
 # Delta (should be less than inverse of population size)
 __C.train.delta = 0.001
 # Population size

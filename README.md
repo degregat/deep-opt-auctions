@@ -3,28 +3,48 @@ Fork of [Optimal Auctions through Deep Learning](https://github.com/saisrivatsan
 
 The outer loop of the lagrange optimizer (see Section 4 of the [paper on "Optimal Auctions through Deep Learning"](https://arxiv.org/pdf/1706.03459.pdf)) in this fork is differentially private, bounding the rate of change of the lagrange multipliers on the regret per agent. Therefore, the influence each agent has on the resulting allocation and payment functions is bounded.
 
+## MPC Federated Learning with tf-encrypted
+For now, MPC happens offline, using processes for agent separation. It averages aggregated lagrangian updates from full local simulations, using the [pond protocol](https://github.com/tf-encrypted/tf-encrypted/blob/master/tf_encrypted/protocol/pond/pond.py) of [TF Encrypted](https://github.com/tf-encrypted/tf-encrypted). It loosely follows the [federated learning](https://github.com/tf-encrypted/tf-encrypted/tree/master/examples/federated-learning) example, with the difference of directly using the compute_gradients and apply_gradients functions of the optimizer. This way TF Privacy can be used directly. In this iteration, the assumption still is that agents submit gradients, during the computation of which they have applied noise and clipping correctly. The main improvement is increased confidentiality.
+
+#### Next steps
+- port to TF2.0
+- agentwise simulation and aggregation of all necessary model parameters
+- networking and async orchestration
+- distribute application of noise and clipping to reduce trust needed in agents
+
+## Examples
+
+Here you can see annotated example notebooks of the settings: 
+- [additive_1x2_uniform](https://github.com/degregat/deep-opt-auctions/blob/exp_comparison_dp_no_dp_additive_1x2_uniform/regretNet/batch_experiments/additive_1x2_uniform_batch_1/visualize_additive_1x2_uniform_batch_1.ipynb) with differential privacy, no MPC aggregation
+- [additive_5x10_uniform](https://github.com/degregat/deep-opt-auctions/blob/exp_comparison_dp_no_dp_additive_5x10_uniform/regretNet/batch_experiments/additive_5x10_uniform_batch_1/visualize_additive_5x10_uniform_batch_1.ipynb) with differential privacy, no MPC aggregation
+
 ## Getting Started
 
-- Install Python 2.7
+- install Python >=3.6.8
 - clone this repository and `cd` into it
-- run `pip2 install -r requirements.txt`
+- install requirements with pipenv or pip (e.g. `pip3 install -r requirements.txt --user`)
 
 ## Running the experiments
 
 ### RegretNet
 
-in `deep-opt-auctions/regretNet` execute `./run_batch.py`
+In `deep-opt-auctions/regretNet` execute `./run_batch.py`
 
 Supported settings so far are `additive_1x2_uniform` and `additive_5x10_uniform`. Modifying other configs is straightforward (see:  "Parameters for differentially private optimizer" in `deep-opt-auctions/regretNet/cfgs/additive_1x2_uniform_config.py`)
 
-
 Example:
-`./run_batch.py --setting additive_5x10_uniform --noise-vals 1.1 1.2 1.3 --clip-vals 1 1.5 2 --add-no-dp-run --iterations 100000 --description example_1`
+`./run_batch.py --setting additive_5x10_uniform --noise-vals 0.001 0.01 0.1 --clip-vals 0.1 0.5 1 --add-no-dp-run --iterations 100000`
 
-This will create `additive_5x10_uniform_batch_1` in `batch_experiments`, which contains `visualize_additive_5x10_uniform_batch_1.ipynb` displaying the results of the runs. The final model, data logs and the visualization will be commited to the branch `exp_example_1`. If you give a description, it should be unique. If you dont pick one, the branch will be called the same as the directory of the batch. To examine the results, switch to the branch after the run has finished.
+This will create `additive_5x10_uniform_batch_1` in `batch_experiments`, which contains `visualize_additive_5x10_uniform_batch_1.ipynb` displaying the results of the runs. 
 
 Note:
-Because of the branching during experiments, it is not advisable to run the experiments in your development repository, or to run multiple batches in parallel. Use multiple copies of the repository instead. If you want to use a single repository and do without versioning of the experiments, comment out `commit_code()` and `commit_data()` in `run_batch.py`. (Later versions might use an experiment framework to alleviate this.)
+You can also have code and results commited to git. To do that, uncomment `commit_code()`, `commit_data()` and the exeption handlers in `run_batch` of `run_batch.py`.
+The final model, data logs and the visualization will be commited to the branch `exp_example_1`. If you give a description, it should be unique. To examine the results, switch to the branch after the run has finished. Because of the branching during experiments, it is not advisable to do this in your development repository, or to run multiple batches in parallel. Use multiple copies of the repository instead. (Later versions might use an experiment framework to alleviate this.)
+
+## Open Problems
+- Interpretation of the results regarding robustness
+- Analyze effect of and refine orders [more information here](https://github.com/tensorflow/privacy/blob/master/tutorials/walkthrough/walkthrough.md)
+
 
 
 # Optimal Auctions through Deep Learning

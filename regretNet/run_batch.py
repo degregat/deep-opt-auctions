@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 from pathlib import Path
 from itertools import product
@@ -23,6 +23,11 @@ from data import *
 from clip_ops.clip_ops import *
 from trainer import *
 
+# DEBUG
+#import pudb; pu.db
+#from tensorflow.python import debug as tf_debug
+
+
 # Initialize yaml serializer
 from easydict import EasyDict as edict
 yaml = YAML()
@@ -40,8 +45,10 @@ parser.add_argument('--setting', type=str, nargs='?', choices=settings, required
 parser.add_argument('--noise-vals', type=float, nargs='+', help='Array of noise_multiplier values')
 parser.add_argument('--clip-vals', type=float, nargs='+', help='Array of l2_norm_clip values')
 parser.add_argument('--iterations', type=int, nargs='?', help='Number of iterations for each instance')
+parser.add_argument('--mpc-off', type=bool, nargs='+', help='Toggle MPC')
 parser.add_argument('--add-no-dp-run', action='store_true', help='Run one instance with no differential privacy')
 parser.add_argument('--description', type=str, nargs='?', help='Short description of the batch, should be unique')
+parser.add_argument('--parallel', type=int, nargs='?', help='How many trainers or tests to run in parallel')
 args = parser.parse_args()
 
 # Helper functions
@@ -116,10 +123,10 @@ class Batch():
         self.iterations = args.iterations
         self.add_no_dp_run = args.add_no_dp_run
         self.description = args.description
+        self.mpc_off = args.mpc_off
 
         # How many trainers/tests to run in parallel
-        self.parallel_trainers = 3
-        self.parallel_tests = 3
+        self.parallel = args.parallel
 
         # Commit all models instead of only the last one
         self.commit_all = False
@@ -187,8 +194,12 @@ class Batch():
 
         # Save the model often to get more datapoints from tests
         cfg.train.save_iter = 1000
-        cfg.train.max_to_keep = self.iterations / 1000
+        cfg.train.max_to_keep = int(self.iterations / 1000)
 
+        # MPC
+        if self.mpc_off:
+            cfg.mpc = False
+        
         # Test flags
         if self.test_fast :
             cfg.test.num_misreports = 1
@@ -218,7 +229,7 @@ class Batch():
 
     # Run the trainer once for each config that was generated
     def train_all(self):
-        pool = Pool(self.parallel_trainers)
+        pool = Pool(self.parallel)
 
         try:
             pool.map(partial(train, self.setting), self.configs)
@@ -230,7 +241,7 @@ class Batch():
 
     # Run the test once for each model that was generated
     def test_all(self):
-        pool = Pool(self.parallel_trainers)
+        pool = Pool(self.parallel)
 
         try:
             pool.map(partial(test, self.setting), self.configs)
@@ -264,7 +275,7 @@ class Batch():
         with open('visualize_batch.ipynb') as f:
             nb = nbformat.read(f, as_version=4)
 
-        ep = ExecutePreprocessor(timeout=600, kernel_name='python2')
+        ep = ExecutePreprocessor(timeout=600, kernel_name='python3')
         ep.preprocess(nb, {'metadata': {'path': str(self.batch_dir) }})
 
         with open(str(self.batch_dir / Path('visualize_' + self.batch_id + '.ipynb')), 'w') as f:
@@ -307,6 +318,7 @@ class Batch():
         models = [ model for exp_dir in self.exp_dirs for model in exp_dir.glob('model-'+str(self.iterations)+'*') ]
 
         if self.commit_all == False:
+            # FIXME: Only use GitPython as git.add fails with some git versions
             self.git.add(*(out))
             self.git.add(*(models))
         elif self.commit_all == True:
@@ -327,7 +339,7 @@ class Batch():
             self.batch_id = self.set_batch_id()
             self.batch_dir = self.set_batch_dir()
 
-            self.commit_code()
+            #self.commit_code()
 
             self.make_dirs()
             self.write_cmd()
@@ -339,14 +351,14 @@ class Batch():
             self.accumulate_train_data()
             self.accumulate_test_data()
             self.visualize()
-            self.commit_batch()
+            #self.commit_batch()
 
         except Exception as e:
-            self.git.checkout(self.former_branch)
+            #self.git.checkout(self.former_branch)
             print(e)
 
         except KeyboardInterrupt as e:
-            self.git.checkout(self.former_branch)
+            #self.git.checkout(self.former_branch)
             print(e)
 
         except Warning:
