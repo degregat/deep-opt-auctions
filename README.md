@@ -17,6 +17,8 @@ For now, MPC happens offline, using processes for agent separation. It averages 
 Here you can see annotated example notebooks of the settings: 
 - [additive_1x2_uniform](https://github.com/degregat/deep-opt-auctions/blob/exp_comparison_dp_no_dp_additive_1x2_uniform/regretNet/batch_experiments/additive_1x2_uniform_batch_1/visualize_additive_1x2_uniform_batch_1.ipynb) with differential privacy, no MPC aggregation
 - [additive_5x10_uniform](https://github.com/degregat/deep-opt-auctions/blob/exp_comparison_dp_no_dp_additive_5x10_uniform/regretNet/batch_experiments/additive_5x10_uniform_batch_1/visualize_additive_5x10_uniform_batch_1.ipynb) with differential privacy, no MPC aggregation
+- [additive_1x2_uniform](https://github.com/degregat/deep-opt-auctions/blob/exps_mpc_lagrangian/regretNet/batch_experiments/additive_1x2_uniform_batch_1/visualize_additive_1x2_uniform_batch_1.ipynb) with differential privacy, mpc aggregation of lagrangian updates from full simulations
+- [additive_5x10_uniform](https://github.com/degregat/deep-opt-auctions/blob/exps_mpc_lagrangian/regretNet/batch_experiments/additive_5x10_uniform_batch_2/visualize_additive_5x10_uniform_batch_2.ipynb) with differential privacy, mpc aggregation of lagrangian updates from full simulations
 
 ## Getting Started
 
