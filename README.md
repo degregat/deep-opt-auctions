@@ -25,6 +25,9 @@ In intermediate noise settings, we get better-than-lottery welfare and revenue, 
 
 In high noise settings, we approach a lottery, resulting in worse allocative welfare and revenue, but low regret.
 
+Example plots: 
+- [Multiple runs, single valuation set](https://github.com/degregat/deep-opt-auctions/blob/exp_one_shot_single_valuation_1/regretNet/batch_experiments/one_shot_single_valuation_1/visualize_one_shot_comparison.ipynb)
+
 ### Limitations 
 
 For now, we only analyze agent types constrained to 0/1, which enables us to enumerate all possible 1024 (mis)reports for an agent in the 10 item case.
