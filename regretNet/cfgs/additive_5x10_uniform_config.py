@@ -45,7 +45,7 @@ __C.train.restore_iter = 0
 # max iters to train 
 __C.train.max_iter = 400000
 # Learning rate of network param updates
-__C.train.learning_rate = 1e-3
+__C.train.learning_rate = 1e-4
 # Regularization
 __C.train.wd = None
 
@@ -55,7 +55,7 @@ __C.train.data = "fixed"
 # Number of batches
 __C.train.num_batches = 5000
 # Train batch size
-__C.train.batch_size = 128
+__C.train.batch_size = 1
 
 """ Differential Privacy params """
 # Number of microbatches (if None, default to size of minibatch)
@@ -135,7 +135,7 @@ __C.test.data = "online"
 # Number of test batches
 __C.test.num_batches = 100
 # Test batch size
-__C.test.batch_size = 100
+__C.test.batch_size = 1
 # Save Ouput
 __C.test.save_output = False
 

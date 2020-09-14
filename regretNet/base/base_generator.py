@@ -18,7 +18,7 @@ class BaseGenerator(object):
         
                        
     def build_generator(self, X = None, ADV = None):
-        if self.mode is "train":            
+        if self.mode is "train":
             if self.config.train.data is "fixed":
                 if self.config.train.restore_iter == 0:
                     self.get_data(X, ADV)

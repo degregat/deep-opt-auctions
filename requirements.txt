@@ -1,11 +1,11 @@
-tensorflow==1.13.1
+#python up to 3.7
+tensorflow==1.14
 numpy==1.16.3
-matplotlib==2.2.4
+matplotlib==3.2.1
 easydict==1.9
--e git+https://github.com/tensorflow/privacy@bb89ba6963e43ea3a44c7d93bcdf44d44449ec4b#egg=privacy
+-e git+https://github.com/tensorflow/privacy@da9fb28b37535a66bb4092843c965f6e21667e2e#egg=privacy
 pathlib==1.0.1
-ruamel.yaml==0.16.1
-pandas==0.24.2
-GitPython==2.1.14
+#ruamel.yaml==0.16.1
+pandas==1.0.3
 jupyter==1.0.0
 seaborn==0.9.0

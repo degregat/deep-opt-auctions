@@ -1,13 +1,47 @@
-# Differentially Private Approximately Optimal Auctions through Deep Learning
+# Approximately Optimal Auctions through Differentially Private One-Shot Learning
 Fork of [Optimal Auctions through Deep Learning](https://github.com/saisrivatsan/deep-opt-auctions) (https://arxiv.org/pdf/1706.03459.pdf), using [TensorFlow Privacy](https://github.com/tensorflow/privacy/) to make the RegretNet approach Differentially Private, resulting in Approximate Truthfulness and Collusion Resistance in the sense of “Mechanism Design via Differential Privacy" (Frank McSherry and Kunal Talwar, In FOCS, pages 94–103, 2007). This means we can relax the assumption of having prior knowledge of the valuation profiles.
 
-The outer loop of the lagrange optimizer (see Section 4 of the [paper on "Optimal Auctions through Deep Learning"](https://arxiv.org/pdf/1706.03459.pdf)) in this fork is differentially private, bounding the rate of change of the lagrange multipliers on the regret per agent. Therefore, the influence each agent has on the resulting allocation and payment functions is bounded.
+Only a single report is taken from each agent. We perform one-shot learning on these to learn an auction and plug in those same reports to calculate Revenue, Regret and Welfare.
+
+Since the potential to outperform a truthful report in the learned mechanism, by misreporting during the training, should be bounded, the incentive to misreport would also be bounded. Thus, the mechanism learner should be approximately truthful.
+
+## Changes in the one-shot learner
+
+The optimizer for the auction parameters (`opt_1` in the code) (see Section 4 of the [paper on "Optimal Auctions through Deep Learning"](https://arxiv.org/pdf/1706.03459.pdf)) in this fork is differentially private, bounding the influence of reports on the resulting auction. Therefore, the influence each agent has on the resulting allocation and payment functions is bounded.
+
+## Analysis
+
+As a first attempt to verify approximate truthfulness, we take one set of valuations [v_0, v_1, v_2, v_3, v_4].
+
+We enumerate all possible (mis)reports (m_0 to m_1023) for Agent_0, take a single misreport with the fixed valuations of the other agents ([m_0, v_1, v_2, v_3, v_4] to [m_1023, v_1, v_2, v_3, v_4]) and train one auction per set of reports.
+
+To measure the performance, we compare utility and other metrics across all auctions learned from the (mis)report + valuations.
+
+
+### Preliminary results
+In low noise settings, we have high regret and slow convergence.
+
+In intermediate noise settings, we get better-than-lottery welfare and revenue, as well as lower regret and faster convergence than with low noise.
+
+In high noise settings, we approach a lottery, resulting in worse allocative welfare and revenue, but low regret.
+
+### Limitations 
+
+For now, we only analyze agent types constrained to 0/1, which enables us to enumerate all possible 1024 (mis)reports for an agent in the 10 item case.
+
+### TODO
+
+- Explore valuation-space
+- Quantify approximation of truthfulness in relation to epsilon for different settings
+- Benchmark
+  - against deep-opt-auctions
+  - against e.g. second price auction
 
 ## Getting Started
 
-- Install Python 2.7
+- Install Python 3.7
 - clone this repository and `cd` into it
-- run `pip2 install -r requirements.txt`
+- run `pip3 install -r requirements.txt`
 
 ## Running the experiments
 
@@ -15,22 +49,24 @@ The outer loop of the lagrange optimizer (see Section 4 of the [paper on "Optima
 
 in `deep-opt-auctions/regretNet` execute `./run_batch.py`
 
-Supported settings so far are `additive_1x2_uniform` and `additive_5x10_uniform`. Modifying other configs is straightforward (see:  "Parameters for differentially private optimizer" in `deep-opt-auctions/regretNet/cfgs/additive_1x2_uniform_config.py`)
+Supported settings so far are `additive_5x10` (which is additive_5x10_uniform, but with types constrained to 0/1).
+
+Basic example:
+`./run_batch.py --setting additive_5x10 --noise-vals 0.01 0.03 0.05 0.07 0.09 --clip-vals 1 --add-no-dp-run --iterations 500`
+
+If you want to learn another auction (since learning is not deterministic) for the same valuations, using 16 processes:
+`./run_batch.py --setting additive_5x10 --noise-vals 0.01 0.03 --clip-vals 1 --iterations 500 --pool-size 16 --valuations some/valuations.npy`
 
 
-Example:
-`./run_batch.py --setting additive_5x10_uniform --noise-vals 1.1 1.2 1.3 --clip-vals 1 1.5 2 --add-no-dp-run --iterations 100000 --description example_1`
 
-This will create `additive_5x10_uniform_batch_1` in `batch_experiments`, which contains `visualize_additive_5x10_uniform_batch_1.ipynb` displaying the results of the runs. The final model, data logs and the visualization will be commited to the branch `exp_example_1`. If you give a description, it should be unique. If you dont pick one, the branch will be called the same as the directory of the batch. To examine the results, switch to the branch after the run has finished.
 
-Note:
-Because of the branching during experiments, it is not advisable to run the experiments in your development repository, or to run multiple batches in parallel. Use multiple copies of the repository instead. If you want to use a single repository and do without versioning of the experiments, comment out `commit_code()` and `commit_data()` in `run_batch.py`. (Later versions might use an experiment framework to alleviate this.)
 
-#### Examples
 
-Here you can see annotated example notebooks of the settings: 
-- [additive_1x2_uniform](https://github.com/degregat/deep-opt-auctions/blob/exp_comparison_dp_no_dp_additive_1x2_uniform/regretNet/batch_experiments/additive_1x2_uniform_batch_1/visualize_additive_1x2_uniform_batch_1.ipynb) 
-- [additive_5x10_uniform](https://github.com/degregat/deep-opt-auctions/blob/exp_comparison_dp_no_dp_additive_5x10_uniform/regretNet/batch_experiments/additive_5x10_uniform_batch_1/visualize_additive_5x10_uniform_batch_1.ipynb) 
+
+
+
+
+
 
 # Optimal Auctions through Deep Learning
 Implementation of "Optimal Auctions through Deep Learning" (https://arxiv.org/pdf/1706.03459.pdf)

@@ -1,7 +1,3 @@
-
-
-
-
 import os
 import sys
 import time
@@ -10,10 +6,10 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 
-from privacy.analysis import privacy_ledger
-from privacy.analysis.rdp_accountant import compute_rdp_from_ledger
-from privacy.analysis.rdp_accountant import get_privacy_spent
-from privacy.optimizers import dp_optimizer
+from tensorflow_privacy.privacy.analysis import privacy_ledger
+from tensorflow_privacy.privacy.analysis.rdp_accountant import compute_rdp_from_ledger
+from tensorflow_privacy.privacy.analysis.rdp_accountant import get_privacy_spent
+from tensorflow_privacy.privacy.optimizers import dp_optimizer
 
 # Compatibility with tf 1 and 2 APIs for TensorFlow Privacy
 try:
@@ -66,7 +62,7 @@ class Trainer(object):
     def calc_priv(self, sess):
       tic = time.time()
       orders = [1 + x / 10. for x in range(1, 100)] + list(range(12, 64))
-      _samples, _queries = self.opt_3_ledger.get_unformatted_ledger()
+      _samples, _queries = self.opt_ledger.get_unformatted_ledger()
       samples = sess.run(_samples)
       queries = sess.run(_queries)
       formatted_ledger = privacy_ledger.format_ledger(samples, queries)
@@ -201,52 +197,49 @@ class Trainer(object):
             loss_2 = -tf.reduce_sum(u_mis)
             loss_3 = -lag_loss
 
-            if (self.config.train.noise_multiplier, self.config.train.l2_norm_clip) != (None, None):
-              if self.config.train.microbatches == None:
-                vec_len = 1
-              else:
-                vec_len = self.config.train.microbatches
 
-              loss_3_vec = [ loss_3 for i in range(0, vec_len) ]
 
             reg_losses = tf.get_collection('reg_losses')
             if len(reg_losses) > 0:
                 reg_loss_mean = tf.reduce_mean(reg_losses)
                 loss_1 = loss_1 + reg_loss_mean
 
+            if (self.config.train.noise_multiplier, self.config.train.l2_norm_clip) != (None, None):
+              if self.config.train.microbatches == None:
+                vec_len = 1
+              else:
+                vec_len = self.config.train.microbatches
+
+              loss_1_vec = [ loss_1 for i in range(0, vec_len) ]
+                
 
             learning_rate = tf.Variable(self.config.train.learning_rate, trainable = False)
 
             # Optimizer
-            opt_1 = tf.train.AdamOptimizer(learning_rate)
-            opt_2 = tf.train.AdamOptimizer(self.config.train.gd_lr)
-
-
             if (self.config.train.noise_multiplier, self.config.train.l2_norm_clip) != (None, None):
-              # Population size is the number of agents
-              self.opt_3_ledger = self.gen_ledger(self.config.train.pop_size, self.config.train.dp_batch_size)
-              # TODO: Do we need the Gaussian version here?
-              opt_3 = dp_optimizer.DPGradientDescentGaussianOptimizer(
-                l2_norm_clip=self.config.train.l2_norm_clip,
-                noise_multiplier=self.config.train.noise_multiplier,
-                num_microbatches=self.config.train.microbatches,
-                ledger=self.opt_3_ledger,
-                learning_rate=update_rate)
+                # Population size is the number of agents
+                self.opt_ledger = self.gen_ledger(self.config.train.pop_size, self.config.train.dp_batch_size)
 
+                opt_1 = dp_optimizer.DPAdamGaussianOptimizer(
+                    l2_norm_clip=self.config.train.l2_norm_clip,
+                    noise_multiplier=self.config.train.noise_multiplier,
+                    num_microbatches=self.config.train.microbatches,
+                    ledger=self.opt_ledger,
+                    learning_rate=learning_rate)
             else:
-              opt_3 = tf.train.GradientDescentOptimizer(update_rate)
+                opt_1 = tf.train.AdamOptimizer(learning_rate)
+                
+            opt_2 = tf.train.AdamOptimizer(self.config.train.gd_lr)
+            opt_3 = tf.train.GradientDescentOptimizer(update_rate)
 
             #  ops
-            self.train_op = opt_1.minimize(loss_1, var_list = var_list)
-            self.train_mis_step = opt_2.minimize(loss_2, var_list = [self.adv_var])
-
             if (self.config.train.noise_multiplier, self.config.train.l2_norm_clip) != (None, None):
-              self.lagrange_update = opt_3.minimize(loss_3_vec, var_list = [self.w_rgt])
+                self.train_op = opt_1.minimize(loss_1_vec, var_list = var_list)
             else:
-              self.lagrange_update = opt_3.minimize(loss_3, var_list = [self.w_rgt])
+                self.train_op = opt_1.minimize(loss_1, var_list = var_list)
 
-            print("w_rgt: ")
-            print(self.w_rgt)
+            self.train_mis_step = opt_2.minimize(loss_2, var_list = [self.adv_var])
+            self.lagrange_update = opt_3.minimize(loss_3, var_list = [self.w_rgt])
 
             # Val ops
             val_mis_opt = tf.train.AdamOptimizer(self.config.val.gd_lr)
@@ -270,11 +263,12 @@ class Trainer(object):
             if len(reg_losses) > 0: tf.summary.scalar('reg_loss', reg_loss_mean)
 
             self.merged = tf.summary.merge_all()
-            self.saver = tf.train.Saver(max_to_keep = self.config.train.max_to_keep)
+            # TODO: How to best calculate max_to_keep
+            self.saver = tf.compat.v1.train.Saver(max_to_keep = self.config.train.max_to_keep)
 
             #Save data
 
-            self.train_val_columns = ["Iter", "Noise", "Clip", "Priv_Calc_Time", "Epsilon", "Train_Time"] + self.metric_names
+            self.train_val_columns = ["Exp", "Report", "Iter", "Noise", "Clip", "Priv_Calc_Time", "Epsilon", "Train_Time"] + self.metric_names
             self.train_array = []
             self.val_array = []
 
@@ -292,7 +286,7 @@ class Trainer(object):
             self.saver = tf.train.Saver(var_list = var_list)
 
             # Noise and Clip do not get used by test mode, but are needed to sort the data
-            self.test_columns = ["Iter", "Noise", "Clip", "Batch", "Time", "Revenue", "Regret", "IRP"]
+            self.test_columns = ["Exp", "Report", "Iter", "Noise", "Clip", "Batch", "Time", "Revenue", "Regret", "IRP"]
             self.test_array = []
 
         # Helper ops post GD steps
@@ -304,6 +298,7 @@ class Trainer(object):
         Runs training
         """
         self.train_gen, self.val_gen = generator
+        np.save(os.path.join(self.config.dir_name, 'reports'), self.train_gen.reports)
 
         iter = self.config.train.restore_iter
         sess = tf.InteractiveSession()
@@ -362,7 +357,7 @@ class Trainer(object):
             if ((iter % self.config.train.save_iter) == 0) or (iter == self.config.train.max_iter):
                 self.saver.save(sess, os.path.join(self.config.dir_name,'model'), global_step = iter)
                 self.train_gen.save_data(iter)
-
+                
             if (iter % self.config.train.print_iter) == 0:
                 # Train Set Stats
                 summary = sess.run(self.merged, feed_dict = {self.x: X})
@@ -376,11 +371,11 @@ class Trainer(object):
                   eps, priv_time = self.calc_priv(sess)
                   priv_str = "epsilon: %.2f, calculation time: %.2f, noise: %.5f, clip: %.5f"%(eps, priv_time, self.config.train.noise_multiplier, self.config.train.l2_norm_clip)
                   self.logger.info(priv_str)
-                  train_row = [iter, self.config.train.noise_multiplier, self.config.train.l2_norm_clip, priv_time, eps, time_elapsed] + metric_vals
+                  train_row = [self.config.exp_num, self.config.report_num, iter, self.config.train.noise_multiplier, self.config.train.l2_norm_clip, priv_time, eps, time_elapsed] + metric_vals
 
                 else:
                   # When running an experiment without DP, save all DP measurements as 0.
-                  train_row = [iter, 0, 0, 0, 0, time_elapsed] + metric_vals
+                  train_row = [self.config.exp_num, self.config.report_num, iter, 0, 0, 0, 0, time_elapsed] + metric_vals
 
                 self.train_array.append(train_row)
                 pd.DataFrame(self.train_array, columns=self.train_val_columns).to_csv(os.path.join(self.config.dir_name,'train_data.csv'))
@@ -436,10 +431,10 @@ class Trainer(object):
 
         metric_tot = np.zeros(len(self.metric_names))
 
-        if self.config.test.save_output:
-            assert(hasattr(generator, "X")), "save_output option only allowed when config.test.data = Fixed or when X is passed as an argument to the generator"
-            alloc_tst = np.zeros(self.test_gen.X.shape)
-            pay_tst = np.zeros(self.test_gen.X.shape[:-1])
+        #if self.config.test.save_output:
+            #assert(hasattr(self.config.test.data, "fixed")), "save_output option only allowed when config.test.data = Fixed or when X is passed as an argument to the generator"
+            #alloc_tst = np.zeros(self.test_gen.X.shape)
+            #pay_tst = np.zeros(self.test_gen.X.shape[:-1])
 
         for i in range(self.config.test.num_batches):
             tic = time.time()
@@ -455,6 +450,8 @@ class Trainer(object):
             metric_vals = sess.run(self.metrics, feed_dict = {self.x: X})
 
             if self.config.test.save_output:
+                alloc_tst = np.zeros(X.shape)
+                pay_tst = np.zeros(X.shape[:-1])
                 A, P = sess.run([self.alloc, self.pay], feed_dict = {self.x:X})
                 alloc_tst[perm, :, :] = A
                 pay_tst[perm, :] = P
@@ -471,7 +468,7 @@ class Trainer(object):
         fmt_vals = tuple([ item for tup in zip(self.metric_names, metric_tot) for item in tup ])
         log_str = "TEST ALL-%d: t = %.4f"%(iter, time_elapsed) + ", %s: %.6f"*len(self.metric_names)%fmt_vals
         self.logger.info(log_str)
-        test_row = [iter, self.config.train.noise_multiplier, self.config.train.l2_norm_clip, i, time_elapsed] + metric_vals
+        test_row = [self.config.exp_num, self.config.report_num, iter, self.config.train.noise_multiplier, self.config.train.l2_norm_clip, i, time_elapsed] + metric_vals
         self.test_array.append(test_row)
         pd.DataFrame(self.test_array, columns=self.test_columns).to_csv(os.path.join(self.config.dir_name, 'iter_' + str(iter) + '_test_data.csv'))
 

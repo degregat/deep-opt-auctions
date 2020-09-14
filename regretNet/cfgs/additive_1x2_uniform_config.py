@@ -70,8 +70,8 @@ __C.train.l2_norm_clip = 10.0
 __C.train.delta = 0.001
 # Population size
 __C.train.pop_size = __C.num_agents
-# Batch size for the dp optimizer (outer loop of lagrange optimizer)
-__C.train.dp_batch_size = 1
+# Batch size for the dp optimizer
+__C.train.dp_batch_size = __C.train.batch_size
 
 """ Train-misreport params """
 # Cache-misreports after misreport optimization
