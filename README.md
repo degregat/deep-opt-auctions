@@ -11,30 +11,30 @@ The optimizer for the auction parameters (`opt_1` in the code) (see Section 4 of
 
 ## Analysis
 
-As a first attempt to verify approximate truthfulness, we take one set of valuations [v_0, v_1, v_2, v_3, v_4].
+As a first attempt to verify approximate truthfulness, we take one set of valuations [v_0, ..., v_N-1] for N agents.
 
-We enumerate all possible (mis)reports (m_0 to m_1023) for Agent_0, take a single misreport with the fixed valuations of the other agents ([m_0, v_1, v_2, v_3, v_4] to [m_1023, v_1, v_2, v_3, v_4]) and train one auction per set of reports.
+We take  enumerate all possible (mis)reports [m_0, m_S-1] (sample size of S) for Agent_0, take a single misreport leaving the valuations of the other agents fixed ([m_0, v_1, ..., v_N-1] to [m_S-1, v_1, ..., v_N-1]) and train one auction per set of reports.
 
-To measure the performance, we compare utility and other metrics across all auctions learned from the (mis)report + valuations.
+To empirically measure the performance, we compare utility, regret and welfare across all auctions learned from the (mis)report + valuations.
 
+To explore the valuation space, we sample different valuation sets and repeat the above process.
 
 ### Preliminary results
-In low noise settings, we have high regret and slow convergence.
+In settings without differential privacy, the misreporting agent is able to outperform the others by a large margin (for some valuation sets).
 
-In intermediate noise settings, we get better-than-lottery welfare and revenue, as well as lower regret and faster convergence than with low noise.
+In settings with differential privacy, the margin by which the misreporting agent can outperform the others gets bounded more tightly (for all sampled valuation sets).
 
-In high noise settings, we approach a lottery, resulting in worse allocative welfare and revenue, but low regret.
+As noise increases, we transition to a lottery, meaning the bounds on regret and utility for each agent are broadened. Revenue and welfare are decreased.
 
-Example plots: 
-- [Multiple runs, single valuation set](https://github.com/degregat/deep-opt-auctions/blob/exp_one_shot_single_valuation_1/regretNet/batch_experiments/one_shot_single_valuation_1/visualize_one_shot_comparison.ipynb)
+Example plots:
+- [Multiple runs, single valuation set](https://github.com/degregat/deep-opt-auctions/blob/exp_one_shot_single_valuation_1/regretNet/batch_experiments/one_shot_single_valuation_1/visualize_one_shot_comparison.ipynb) (to show non-determinism from training)
 
-### Limitations 
+### Limitations
 
-For now, we only analyze agent types constrained to 0/1, which enables us to enumerate all possible 1024 (mis)reports for an agent in the 10 item case.
+For now, we only analyze agent types constrained to 0/1, which enables us to feasibly enumerate all possible (mis)reports for an agent up to the 10 item case (2^10 = 1024 misreports).
 
 ### TODO
 
-- Explore valuation-space
 - Quantify approximation of truthfulness in relation to epsilon for different settings
 - Benchmark
   - against deep-opt-auctions
@@ -52,15 +52,13 @@ For now, we only analyze agent types constrained to 0/1, which enables us to enu
 
 in `deep-opt-auctions/regretNet` execute `./run_batch.py`
 
-Supported settings so far are `additive_5x10` (which is additive_5x10_uniform, but with types constrained to 0/1).
+Supported settings so far are `additive_1x2, additive_5x3, additive_5x10` (which are additive_NxM_uniform, but with types constrained to 0/1).
 
 Basic example:
-`./run_batch.py --setting additive_5x10 --noise-vals 0.01 0.03 0.05 0.07 0.09 --clip-vals 1 --add-no-dp-run --iterations 500`
+`./run_batch.py --setting additive_5x3 --noise-vals 0.03 0.05 0.09 --clip-vals 1 --add-no-dp-run --iterations 500 --pool-size 16 --sample-size 128`
 
-If you want to learn another auction (since learning is not deterministic) for the same valuations, using 16 processes:
-`./run_batch.py --setting additive_5x10 --noise-vals 0.01 0.03 --clip-vals 1 --iterations 500 --pool-size 16 --valuations some/valuations.npy`
-
-
+If you want to learn another set of auctions (since learning is not deterministic) for the same valuation sets, using up to 16 processes in parallel:
+`./run_batch.py --setting additive_5x3 --noise-vals 0.03 --clip-vals 1 --iterations 500 --pool-size 16 --valuations some/valuations.npy`
 
 
 
@@ -70,6 +68,7 @@ If you want to learn another auction (since learning is not deterministic) for t
 
 
 
+## What follows is the old README.md
 
 # Optimal Auctions through Deep Learning
 Implementation of "Optimal Auctions through Deep Learning" (https://arxiv.org/pdf/1706.03459.pdf)
@@ -77,7 +76,7 @@ Implementation of "Optimal Auctions through Deep Learning" (https://arxiv.org/pd
 ## Getting Started
 
 Install the following packages:
-- Python 2.7 
+- Python 2.7
 - Tensorflow
 - Numpy and Matplotlib packages
 - Easydict - `pip install easydict`
@@ -87,7 +86,7 @@ Install the following packages:
 ### RegretNet
 
 #### For Gradient-Based approach:
-Default hyperparameters are specified in regretNet/cfgs/.  
+Default hyperparameters are specified in regretNet/cfgs/.
 
 #### For Sample-Based approach:
 Modify the following hyperparameters in the config file specified in regretNet/cfg/.
@@ -124,7 +123,7 @@ setting\_no  |      setting\_name |
 
 ### RochetNet (Single Bidder Auctions)
 
-Default hyperparameters are specified in rochetNet/cfgs/.  
+Default hyperparameters are specified in rochetNet/cfgs/.
 For training the network, testing the mechanism learnt and computing the baselines, run:
 ```
 cd rochetNet
@@ -141,10 +140,10 @@ setting\_no  |      setting\_name |
   (e)   |  additive\_1x10\_uniform
   (f)   |   unit\_1x2\_uniform
   (g)   |   unit\_1x2\_uniform\_23
-  
+
 ### MyersonNet (Single Item Auctions)
-  
-Default hyperparameters are specified in utils/cfg.py.  
+
+Default hyperparameters are specified in utils/cfg.py.
 For training the network, testing the mechanism learnt and computing the baselines, run:
 ```
 cd myersonNet
@@ -153,12 +152,12 @@ bash myerson.sh
 ```
 setting\_no  |      setting\_name |
  :---:  | :---: |
-  (a)   |  exponential 
+  (a)   |  exponential
   (b)   |   uniform
-  \(c\) |   asymmetric\_uniform 
+  \(c\) |   asymmetric\_uniform
   (d)   |   irregular
 
- 
+
 ## Settings
 
 ### Single Bidder
@@ -177,11 +176,11 @@ setting\_no  |      setting\_name |
 - **additive\_1x10\_uniform**: A single additive bidder and 10 items, where bidders draw their value for each item from U\[0, 1\].
 
 ### Multiple Bidders
-- **additive\_2x2\_uniform**: Two additive bidders and two items, where bidders draw their value for each item from U\[0, 1\]. 
+- **additive\_2x2\_uniform**: Two additive bidders and two items, where bidders draw their value for each item from U\[0, 1\].
 
 - **unit\_2x2\_uniform**: Two unit-demand bidders and two items, where the bidders draw their value for each item from identical U\[0, 1\].
 
-- **additive\_2x3\_uniform**: Two additive bidders and three items, where bidders draw their value for each item from U\[0, 1\]. 
+- **additive\_2x3\_uniform**: Two additive bidders and three items, where bidders draw their value for each item from U\[0, 1\].
 
 - **CA\_sym\_uniform\_12**: Two bidders and two items, with v<sub>1,1</sub>, v<sub>1,2</sub>, v<sub>2,1</sub>, v<sub>2,2</sub> ∼ U\[1, 2\], v<sub>1,{1,2}</sub> = v<sub>1,1</sub> + v<sub>1,2</sub> + C<sub>1</sub> and v<sub>2,{1,2}</sub> = v<sub>2,1</sub> + v<sub>2,2</sub> + C<sub>2</sub>, where C<sub>1</sub>, C<sub>2</sub> ∼ U\[−1, 1\].
 

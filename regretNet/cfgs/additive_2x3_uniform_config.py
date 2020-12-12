@@ -1,7 +1,5 @@
 
 
-
-
 import os
 import os.path as osp
 import numpy as np
@@ -12,7 +10,7 @@ __C = edict()
 cfg = __C
 
 # Output-dir to write log-files and save model
-__C.dir_name = os.path.join("experiments", "additive_2x3_uniform")
+__C.base_dir = os.path.join("experiments", "additive_5x10_uniform")
 
 # Auction params
 __C.num_agents = 2
@@ -57,8 +55,21 @@ __C.train.data = "fixed"
 # Number of batches
 __C.train.num_batches = 5000
 # Train batch size
-__C.train.batch_size = 128
+__C.train.batch_size = 1
 
+""" Differential Privacy params """
+# Number of microbatches (if None, default to size of minibatch)
+__C.train.microbatches = None
+# Noise muliplier
+__C.train.noise_multiplier = 1.0
+# Norm clip
+__C.train.l2_norm_clip = 10.0
+# Delta (should be less than inverse of population size)
+__C.train.delta = 0.001
+# Population size
+__C.train.pop_size = __C.num_agents
+# Batch size for the dp optimizer (outer loop of lagrange optimizer)
+__C.train.dp_batch_size = 1
 
 """ Train-misreport params """
 # Cache-misreports after misreport optimization
@@ -90,7 +101,8 @@ __C.train.max_to_keep = 10
 __C.train.save_iter = 50000 
 # Train stats print frequency
 __C.train.print_iter = 1000
-   
+# Privacy print frequency
+__C.train.print_privacy_iter = 1000
 
 """ Validation params """
 __C.val = edict()
@@ -123,7 +135,7 @@ __C.test.data = "online"
 # Number of test batches
 __C.test.num_batches = 100
 # Test batch size
-__C.test.batch_size = 100
+__C.test.batch_size = 1
 # Save Ouput
 __C.test.save_output = False
 

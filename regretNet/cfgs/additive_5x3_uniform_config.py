@@ -10,11 +10,11 @@ __C = edict()
 cfg = __C
 
 # Output-dir to write log-files and save model
-__C.base_dir = os.path.join("experiments", "additive_5x10_uniform")
+__C.base_dir = os.path.join("experiments", "additive_5x3_uniform")
 
 # Auction params
 __C.num_agents = 5
-__C.num_items = 10
+__C.num_items = 3
 __C.distribution_type = "uniform"
 __C.agent_type = "additive"
 

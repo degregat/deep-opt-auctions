@@ -7,20 +7,21 @@ from itertools import product
 from functools import partial
 from multiprocessing.pool import Pool
 from multiprocessing import Process
+import threading
 import argparse
 #from ruamel.yaml import YAML
 import copy
 import signal
+import os
 import shutil
 import time
+import random
 
 import tensorflow as tf
 
 import pandas as pd
 import nbformat
 from nbconvert.preprocessors import ExecutePreprocessor
-
-#import git
 
 from nets import *
 from cfgs import *
@@ -32,9 +33,8 @@ from trainer import *
 
 # Supported settings
 # TODO: cleanup
-settings = [ "additive_5x10_reports",
-             "additive_5x10_misreports",
-             "additive_5x10"]
+# TODO: Generalize settings
+settings = ["additive_5x10", "additive_5x3", "additive_2x3"]
 
 # Arguments
 parser = argparse.ArgumentParser(prog='Run experiments of deep-opt-auctions with differential privacy')
@@ -44,9 +44,10 @@ parser.add_argument('--clip-vals', type=float, nargs='+', help='Array of l2_norm
 parser.add_argument('--iterations', type=int, nargs='?', default=1000, help='Number of iterations for each instance')
 parser.add_argument('--interval', type=int, nargs='?', default=50, help='iter interval between model saves/restores. Determines granularity of observations.')
 parser.add_argument('--add-no-dp-run', action='store_true', help='Run one instance with no differential privacy')
-parser.add_argument('--description', type=str, nargs='?', help='Short description of the batch, should be unique')
+#parser.add_argument('--description', type=str, nargs='?', help='Short description of the batch, should be unique')
 parser.add_argument('--valuations', type=str, nargs='?', help='Saved valuations of another run')
-parser.add_argument('--pool-size', type=int, nargs='?', default=4, help='Number of parallel processes')
+parser.add_argument('--pool-size', type=int, nargs='?', default=4, help='Number of parallel processes. If OOM happens, try fewer.')
+parser.add_argument('--sample-size', type=int, nargs='?', default=4, help='Size of sample from valuation space')
 args = parser.parse_args()
 
 # Helper functions
@@ -70,9 +71,23 @@ def train(setting, cfg_and_reports):
             Generator = fixed_reports.Generator
             clip_op_lambda = (lambda x: clip_op_01(x))
             Trainer = trainer.Trainer
-        
+
+        if setting == "additive_5x3":
+            cfg = cfg
+            Net = additive_net.Net
+            Generator = fixed_reports.Generator
+            clip_op_lambda = (lambda x: clip_op_01(x))
+            Trainer = trainer.Trainer
+
+        if setting == "additive_2x3":
+            cfg = cfg
+            Net = additive_net.Net
+            Generator = fixed_reports.Generator
+            clip_op_lambda = (lambda x: clip_op_01(x))
+            Trainer = trainer.Trainer
+
         net = Net(cfg)
-        generator = [Generator(cfg, 'train', reports), Generator(cfg, 'train', reports)] # NOTE: second generator was in 'val' mode
+        generator = [Generator(cfg, 'train', reports), Generator(cfg, 'train', reports)] # NOTE: second generator was in 'val' mode.
         m = trainer.Trainer(cfg, "train", net, clip_op_lambda)
         m.train(generator)
 
@@ -97,92 +112,253 @@ def test(setting, cfg_and_reports):
                 Generator = fixed_reports.Generator
                 clip_op_lambda = (lambda x: clip_op_01(x))
                 Trainer = trainer.Trainer
-                
+
+            if setting == "additive_5x3":
+                cfg = cfg
+                Net = additive_net.Net
+                Generator = fixed_reports.Generator
+                clip_op_lambda = (lambda x: clip_op_01(x))
+                Trainer = trainer.Trainer
+
+            if setting == "additive_2x3":
+                cfg = cfg
+                Net = additive_net.Net
+                Generator = fixed_reports.Generator
+                clip_op_lambda = (lambda x: clip_op_01(x))
+                Trainer = trainer.Trainer
+
             cfg.test.restore_iter = save
             net = Net(cfg)
             generator = Generator(cfg, 'train', reports) # NOTE: this was 'test'
             m = trainer.Trainer(cfg, "test", net, clip_op_lambda)
             m.test(generator)
-            
+
     except KeyboardInterrupt:
         pass
 
     except Exception as err:
         print(err)
-    
 
-# Any distribution with full support should work for misreport calculation. Uniform is robust.
 
-class Experiment():
+class SampleValSpace():
     def __init__(self, args):
         self.args = args
 
-        self.agents = 5
-        self.items = 10
-        
-        # Generate true Valuations
-        if args.valuations:
-            self.valuations = np.load(args.valuations)
+        print(args.setting)
+        if self.args.setting == "additive_2x3":
+            self.agents = 2
+            self.items = 3
+
+        if self.args.setting == "additive_5x10":
+            self.agents = 5
+            self.items = 10
+
+        if self.args.setting == "additive_5x3":
+            self.agents = 5
+            self.items = 3
+
+        #if args.valuations:
+        #    self.valuations = np.load(args.valuations)
+        # and skip enum
+        # rename to valuations/note wether exhausted or sample size
+        # TODO: use bandits for sampling val space more efficiently?
+
+
+    #TODO: Add granularity variation of reports (not only {0,1} but {1/x, 1/2x, ..})
+
+    def enum_valuations(self):
+        valuations = list(map(list, product([0,1], repeat=self.items)))
+        all_valuations = list(map(list, product(valuations, repeat=self.agents)))
+        return(all_valuations)
+
+    # TODO: abstract path handling
+    def set_exh_num(self):
+        prefix = self.args.setting+"_exh_"
+        exhs = list(Path('batch_experiments').glob(prefix+'*'))
+        if len(exhs) == 0:
+            return(1)
         else:
-            self.valuations = self.gen_valuations()
+            exh_nums = [ int(str(e).partition('_exh_')[2]) for e in exhs ]
+            return(max(exh_nums)+1)
+
+    def set_exh_id(self):
+        return(self.args.setting + '_exh_' + str(self.exh_num))
+
+    # TODO: integrate setting var into function call
+    def set_exh_dir(self):
+        return(Path('batch_experiments') / self.set_exh_id())
+
+    def set_results_dir(self):
+        return(self.exh_dir / 'results')
+
+    # TODO: abstract aggregation and visualization
+    def aggregate_data(self):
+        paths = []
+        for i in range(self.num_vals):
+            exp_id = self.args.setting + '_exp_' + str(i)
+            paths.append(self.exh_dir / exp_id)
+
+        util = []
+        tests = []
+        train = []
+        welfare = []
+        for p in paths:
+            util.append(pd.read_csv(p / Path('utility.csv'), index_col=None, header=0))
+            tests.append(pd.read_csv(p / Path('tests.csv'), index_col=None, header=0))
+            train.append(pd.read_csv(p / Path('train.csv'), index_col=None, header=0))
+            welfare.append(pd.read_csv(p / Path('welfare.csv'), index_col=None, header=0))
+        pd.concat(util, axis=0, ignore_index=True).to_csv(Path(self.results_dir) / 'utility.csv')
+        pd.concat(tests, axis=0, ignore_index=True).to_csv(Path(self.results_dir) / 'tests.csv')
+        pd.concat(train, axis=0, ignore_index=True).to_csv(Path(self.results_dir) / 'train.csv')
+        pd.concat(welfare, axis=0, ignore_index=True).to_csv(Path(self.results_dir) / 'welfare.csv')
+
+    def visualize(self):
+        with open('visualize_valuation_space.ipynb') as f:
+            nb = nbformat.read(f, as_version=4)
+
+        ep = ExecutePreprocessor(timeout=600, kernel_name='python3')
+        ep.preprocess(nb, {'metadata': {'path': str(self.results_dir) }})
+
+        with open(str(self.results_dir /
+                      Path('visualize_valuation_space_' + str(self.exh_num) + '.ipynb')), 'w') as f:
+            nbformat.write(nb, f)
+
+    def single_vals_sample(self):
+        # We do not use set, since we want to preserve order.
+        sample = []
+        while len(sample) < self.agents:
+            agent_vals = [ random.randint(0,1) for _ in range(self.items) ]
+            if agent_vals not in sample:
+                sample.append(agent_vals)
+
+        return sample
+
+    def sample_valuations(self):
+        samples = []
+        while len(samples) < self.args.sample_size:
+            sample = self.single_vals_sample()
+            if sample not in samples:
+                samples.append(sample)
+        return samples
+
+    def save_valuations(self, valuations):
+        np.save((Path(self.results_dir) / 'valuations.npy'), valuations)
+
+    def write_cmd(self):
+        with open(str(self.results_dir / (self.exh_id + '_cmd.sh')), 'w') as cmdfile:
+            cmd = ('run_batch.py --setting ' + args.setting +
+                   (' --noise-vals ' + list_to_str(args.noise_vals) if args.noise_vals else '' ) +
+                   (' --clip-vals ' + list_to_str(args.clip_vals) if args.clip_vals else '' ) +
+                   ' --iterations ' + str(args.iterations) +
+                   ' --interval ' + str(args.interval) +
+                   ' --pool-size ' + str(args.pool_size) +
+                   (' --valuations ' + str(args.valuations) if args.valuations else '') +
+                   (' --sample-size ' + str(args.sample_size) if args.sample_size else '') +
+                   (' --add-no-dp-run' if args.add_no_dp_run else '') + '\n')
+            cmdfile.write(cmd)
+
+    def run_exhaust_vals(self):
+        try:
+            self.exh_num = self.set_exh_num()
+            #self.exh_num = 1
+            self.exh_id = self.set_exh_id()
+            self.exh_dir = self.set_exh_dir()
+            self.results_dir = self.set_results_dir()
+
+            self.exh_dir.mkdir()
+            self.results_dir.mkdir()
+            self.write_cmd()
+
+            # Load saved valuations if provided
+            if args.valuations:
+                all_vals = list(map(list, np.load(args.valuations)))
+
+            # If none are provided, generate a sample or enumerate valuations
+            else:
+                if args.sample_size:
+                    print("SAMPLE VALUATIONS")
+                    all_vals = self.sample_valuations()
+                else:
+                    print("ENUMERATE VALUATION PROFILES")
+                    all_vals = self.enum_valuations()
+
+            self.save_valuations(all_vals)
+
+            self.num_vals = len(all_vals)
+
+            # NOTE: atm all batches per experiment are run in parallel
+            # TODO: don't run for valuation report, since thats one of the misreports anyways, just mark it or
+            #       run the valuation report and insert a copy in the misreports
+            for i, vals in enumerate(all_vals):
+                print("START EXPERIMENT " + str(i))
+                Experiment(self.args, vals, self.exh_dir, self.exh_num, i, self.agents, self.items).run_exp()
+                print("EXPERIMENT " + str(i) + " DONE")
+
+            self.aggregate_data()
+            self.visualize()
+            
+        except Exception as e:
+            print(e)
+
+        except KeyboardInterrupt as e:
+            os.killpg(os.getpid(), signal.SIGTERM)
+            print(e)
+
+        except Warning:
+            pass
+
+# Any distribution with full support should work for misreport calculation. Uniform is robust.
+class Experiment():
+    def __init__(self, args, valuations, exh_dir, exh_num, exp_num, agents, items):
+        self.args = args
+
+        self.agents = agents
+        self.items = items
+
+        self.valuations = valuations
+
+        self.exh_dir = exh_dir
+        self.exh_num = exh_num #Unused
+
+        self.exp_num = exp_num
 
         if not Path('batch_experiments').exists():
             Path('batch_experiments').mkdir()
 
-    # Generate initial true valuation reports
-    def gen_valuations(self):
-        valuations = np.random.binomial(1, 0.5, (self.agents, self.items))
-        return valuations
-
     def enum_misreports(self):
-        # Enumerate all misreports (10x1 vectors with elements in
-        # {0,1}). These are 1024.
+        # Enumerate all misreports (items x 1 vectors with elements in
+        # {0,1}. E.g. 1024 in the 10 item case.)
 
-        # Embed every vector in an array, so concatenate get arguments
+        misreports = list(map(list, product([0,1], repeat=self.items)));
+
+        # Embed every vector in an array, so concatenate gets arguments
         # with equal dimension.
-        return ([ [[a, b, c, d, e, f, g, h, i, j]] for a in [0,1]
-                 for b in [0,1]
-                 for c in [0,1]
-                 for d in [0,1]
-                 for e in [0,1]
-                 for f in [0,1]
-                 for g in [0,1]
-                 for h in [0,1]
-                 for i in [0,1]
-                 for j in [0,1]])
+        return([ [ m ] for m in misreports ])
 
+    # TODO: Implement a setting where more than one agent misreports
     # Fix all bids, but those of agent 0
     def gen_misreports(self, misreports):
         # Embeds misreports of agent 0 with fixed reports of the other agents.
         return np.concatenate((misreports, self.valuations[1:]))
-        
-    def set_exp_num(self):
-        prefix = self.args.setting+"_exp_"
-        exps = list(Path('batch_experiments').glob(prefix+'*'))
-        if len(exps) == 0:
-            return(1)
-        else:
-            exp_nums = [ int(str(e).partition('_exp_')[2]) for e in exps ]
-            return(max(exp_nums)+1)
 
     def set_exp_id(self):
         return(self.args.setting + '_exp_' + str(self.exp_num))
-        
+
     def set_exp_dir(self):
-        return(Path('batch_experiments') / self.exp_id)
+        return(self.exh_dir / self.set_exp_id())
 
     def gen_batch_id(self, noise, clip):
         return(self.args.setting + '_noise_' + str(noise) + '_clip_' + str(clip))
-    
+
     def save_valuations(self):
         np.save((Path(self.exp_dir) / 'valuations.npy'), self.valuations)
 
-    def aggregate_data(self, dp_nc):        
+    def aggregate_data(self, dp_nc):
         paths = []
         for noise, clip in dp_nc:
             batch_id = self.gen_batch_id(noise, clip)
             paths.append(self.exp_dir / batch_id)
-            
+
         util = []
         tests = []
         train = []
@@ -216,47 +392,49 @@ class Experiment():
                    ' --clip-vals ' + list_to_str(args.clip_vals) + # if args.clip_vals else '' ) +
                    ' --iterations ' + str(args.iterations) +
                    ' --interval ' + str(args.interval) +
-                   ' --pool-size ' + str(args.pool_size) + 
+                   ' --pool-size ' + str(args.pool_size) +
                    (' --add-no-dp-run' if args.add_no_dp_run else '') + '\n')
-            
+
             cmdfile.write(cmd)
 
     def run_exp(self):
         try:
-            self.exp_num = self.set_exp_num()
-            #self.exp_num =
-
             self.exp_id = self.set_exp_id()
             self.exp_dir = self.set_exp_dir()
-            
+
             self.exp_dir.mkdir()
-            self.write_cmd()
+            #self.write_cmd()
             self.save_valuations()
-            
+
             # Use a new pool per batch to free memory. Same for misreports
             # Batch 0 is truthful, all subsequent ones are misreporting
 
             print("INIT")
             # Generate list of DP parameter tuples
             # TODO: Make dp_nc a field of Experiment
-            dp_nc = list(product(self.args.noise_vals, self.args.clip_vals))
+            if self.args.noise_vals and self.args.clip_vals:
+                dp_nc = list(product(self.args.noise_vals, self.args.clip_vals))
+            else:
+                dp_nc = []
             if self.args.add_no_dp_run:
                 dp_nc.append((None, None))
 
             print("GENERATE MISREPORTS")
             reports = []
+
+            # Insert valuations first
             reports.append(self.valuations)
 
             # Enumerate misreports for agent0
             misreports = self.enum_misreports()#[:1] #uncomment for quick testing
 
             # Concatenate misreport for agent0 with valuations of
-            # agents 1 through 4, for all misreports
+            # agents 1 through n, for all misreports
             for misreport in misreports:
                 reports.append(self.gen_misreports(misreport))
-                
+
             #reports[0] now contains the valuations, reports[1]
-            #through reports[1024] contain all possible misreports
+            #through reports[2^ITEMS] contain all possible misreports
 
             print("RUN BATCHES")
             for noise, clip in dp_nc:
@@ -270,9 +448,12 @@ class Experiment():
 
         except Exception as e:
             print(e)
-            
+            pass
+
         except KeyboardInterrupt as e:
             print(e)
+            os.killpg(os.getpid(), signal.SIGTERM)
+            pass
 
         except Warning:
             pass
@@ -293,10 +474,10 @@ class Batch():
         self.setting = args.setting
         self.iterations = args.iterations
         self.add_no_dp_run = args.add_no_dp_run
-        self.description = args.description
+        #self.description = args.description
         self.interval = args.interval
         self.pool_size = args.pool_size
-        
+
         #self.truthful = truthful
         self.reports = reports
 
@@ -322,6 +503,11 @@ class Batch():
         if self.setting == "additive_5x10":
             self.base_cfg = additive_5x10_uniform_config.cfg
 
+        if self.setting == "additive_5x3":
+            self.base_cfg = additive_5x3_uniform_config.cfg
+
+        if self.setting == "additive_2x3":
+            self.base_cfg = additive_2x3_uniform_config.cfg
 
     def set_batch_dir(self):
         return(self.exp_dir / self.batch_id)
@@ -335,16 +521,16 @@ class Batch():
     def get_run_id(self, report_num):
         # Run 0 are valuation reports
         # Run 1 to n are misreports
-       
+
         if report_num == 0:
             return("valuation_report")
-         
+
         if report_num != 0:
             return("misreport_" + str(report_num))
 
     def get_run_dir(self, report_num):
         return (self.batch_dir / self.get_run_id(report_num))
-        
+
     def check_flags_and_set_to_iter(self, flags):
         for flag in flags:
             if flag > self.iterations:
@@ -356,7 +542,7 @@ class Batch():
         cfg.dir_name = str(self.batch_dir / self.get_run_id(report_num))
         cfg.report_num = report_num
         cfg.exp_num = self.exp_num
-        
+
         cfg.train.max_iter = self.iterations
         # Parameters for differentially private optimizer
         cfg.train.noise_multiplier = self.noise
@@ -414,10 +600,11 @@ class Batch():
             self.pool.close()
             self.pool.join()
             print("TRAINING DONE")
-            
+
         except KeyboardInterrupt:
             self.pool.terminate()
             self.pool.join()
+            os.killpg(os.getpid(), signal.SIGTERM)
             pass
 
         except Exception as e:
@@ -427,14 +614,15 @@ class Batch():
     # Run the test once for each model that was generated
     def test_all(self):
         try:
-            self.pool = Pool(processes=self.pool_size, maxtasksperchild=1)        
+            self.pool = Pool(processes=self.pool_size, maxtasksperchild=1)
             self.pool.imap(partial(test, self.setting), self.configs_and_reports)
             self.pool.close()
             self.pool.join()
-            
+
         except KeyboardInterrupt:
             self.pool.terminate()
             self.pool.join()
+            os.killpg(os.getpid(), signal.SIGTERM)
             pass
 
         except Exception as e:
@@ -467,7 +655,7 @@ class Batch():
             noise, clip = 0, 0
         else:
             noise, clip = self.noise, self.clip
-            
+
         for report_num, run_dir in self.run_dirs:
             valuations = list(np.load(self.exp_dir / Path('valuations.npy')))
 
@@ -475,32 +663,32 @@ class Batch():
                 pay = np.load(Path(run_dir) / Path('pay_tst_' + str(i) + '.npy'))
                 alloc = np.load(Path(run_dir) / Path('alloc_tst_' + str(i) + '.npy'))
                 utilities = np.sum(alloc[0] * valuations, axis=-1) - pay[0] #When batch size is 1, remove array access
-                
+
                 if report_num == 0:
                     self.val_utilities = utilities
                     for agent, utility in enumerate(utilities):
                         utility_array.append([self.exp_num, report_num, i, noise, clip, agent,
                                               utility, 0])
 
-                else: 
+                else:
                     regret = utilities - self.val_utilities
                     for agent, utility in enumerate(utilities):
                         utility_array.append([self.exp_num, report_num, i, noise, clip, agent,
                                               utility, regret[agent] ])
-                
+
         pd.DataFrame(utility_array, columns=columns).to_csv(Path(self.batch_dir / Path('utility_data.csv')))
-        
+
 
     def compute_welfare(self):
         # This computes only allocative welfare, not taking any transfers into account.
         columns = ["Exp", "Report", "Iter", "Noise", "Clip", "Welfare"]
         welfare_array=[]
-        
+
         if (self.noise and self.clip) == None:
             noise, clip = 0, 0
         else:
             noise, clip = self.noise, self.clip
-            
+
         for report_num, run_dir in self.run_dirs:
             valuations = list(np.load(self.exp_dir / Path('valuations.npy')))
             for i in range(self.interval, self.iterations+1, self.interval):
@@ -516,7 +704,7 @@ class Batch():
 
             print("INIT BATCH")
             self.batch_dir = self.set_batch_dir()
-            
+
             self.make_dirs()
 
             print("GENERATE CFGS AND REPORTS")
@@ -531,14 +719,14 @@ class Batch():
             self.get_run_dirs()
             print("ACCUMULATE TRAIN")
             self.accumulate_train_data()
-            print("ACCUMULATE TEST")            
+            print("ACCUMULATE TEST")
             self.accumulate_test_data()
             print("COMPUTE UTILITY")
             self.compute_utility()
             print("COMPUTE WELFARE")
             self.compute_welfare()
 
-            
+
         except KeyboardInterrupt: # as e:
             #print e
             self.pool.close()
@@ -555,5 +743,5 @@ class Batch():
     def batch_dir(self):
         return(self.batch_dir)
 
-exp = Experiment(args)
-exp.run_exp()
+run = SampleValSpace(args)
+run.run_exhaust_vals()

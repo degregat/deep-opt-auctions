@@ -331,6 +331,7 @@ class Trainer(object):
                 sess.run(self.clip_op)
             sess.run(self.reset_train_mis_opt)
 
+            # TODO: simplify Train/Val for one shot
             if self.config.train.data is "fixed" and self.config.train.adv_reuse:
                 self.train_gen.update_adv(perm, sess.run(self.adv_var))
 

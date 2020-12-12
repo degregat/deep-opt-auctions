@@ -63,6 +63,7 @@ class BaseGenerator(object):
             np.save(os.path.join(self.config.dir_name,'ADV_' + str(iter)), self.ADV)            
                        
     def gen_fixed(self):
+        #TODO: simplify Train/Val for one shot
         i = 0
         if self.mode is "train": perm = np.random.permutation(self.num_instances) 
         else: perm = np.arange(self.num_instances)
