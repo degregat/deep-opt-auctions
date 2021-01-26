@@ -27,7 +27,11 @@ In settings with differential privacy, the margin by which the misreporting agen
 As noise increases, we transition to a lottery, meaning the bounds on regret and utility for each agent are broadened. Revenue and welfare are decreased.
 
 Example plots:
-- [Multiple runs, single valuation set](https://github.com/degregat/deep-opt-auctions/blob/exp_one_shot_single_valuation_1/regretNet/batch_experiments/one_shot_single_valuation_1/visualize_one_shot_comparison.ipynb) (to show non-determinism from training)
+- [Sample of 128 valuation sets, showing bounded regret/utility of misreporting agent](https://nbviewer.jupyter.org/github/degregat/deep-opt-auctions/blob/sample_128_5x3/regretNet/batch_experiments/additive_5x3_exh_1/visualize_valuation_sample_128_5x3.ipynb)
+([data](https://github.com/degregat/deep-opt-auctions/blob/sample_128_5x3/regretNet/batch_experiments/additive_5x3_exh_1/))
+
+- [Multiple runs from a single valuation set, showing non-determinism of training](https://nbviewer.jupyter.org/github/degregat/deep-opt-auctions/blob/exp_one_shot_single_valuation_1/regretNet/batch_experiments/one_shot_single_valuation_1/visualize_one_shot_comparison.ipynb)
+([data](https://github.com/degregat/deep-opt-auctions/blob/exp_one_shot_single_valuation_1/regretNet/batch_experiments/one_shot_single_valuation_1/))
 
 ### Limitations
 
