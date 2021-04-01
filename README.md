@@ -30,6 +30,9 @@ Example plots:
 - [Sample of 128 valuation sets, showing bounded regret/utility of misreporting agent](https://nbviewer.jupyter.org/github/degregat/deep-opt-auctions/blob/sample_128_5x3/regretNet/batch_experiments/additive_5x3_exh_1/visualize_valuation_sample_128_5x3.ipynb)
 ([data](https://github.com/degregat/deep-opt-auctions/blob/sample_128_5x3/regretNet/batch_experiments/additive_5x3_exh_1/))
 
+- [Different sample of size 128. Covers a wider range of outcomes, used in arXiv submission](https://nbviewer.jupyter.org/github/degregat/one-shot-approx-auctions/blob/arXiv-submission-data/regretNet/batch_experiments/additive_5x3_exh_1/visualize_valuation_sample.ipynb)
+([data and figures](https://github.com/degregat/one-shot-approx-auctions/blob/arXiv-submission-data/regretNet/batch_experiments/additive_5x3_exh_1/))
+
 - [Multiple runs from a single valuation set, showing non-determinism of training](https://nbviewer.jupyter.org/github/degregat/deep-opt-auctions/blob/exp_one_shot_single_valuation_1/regretNet/batch_experiments/one_shot_single_valuation_1/visualize_one_shot_comparison.ipynb)
 ([data](https://github.com/degregat/deep-opt-auctions/blob/exp_one_shot_single_valuation_1/regretNet/batch_experiments/one_shot_single_valuation_1/))
 
