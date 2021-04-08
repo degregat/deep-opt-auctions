@@ -1,6 +1,7 @@
-# Approximately Optimal Auctions through Differentially Private One-Shot Learning
-Fork of [Optimal Auctions through Deep Learning](https://github.com/saisrivatsan/deep-opt-auctions) (https://arxiv.org/pdf/1706.03459.pdf), using [TensorFlow Privacy](https://github.com/tensorflow/privacy/) to make the RegretNet approach Differentially Private, resulting in Approximate Truthfulness and Collusion Resistance in the sense of [Mechanism Design via Differential Privacy](http://kunaltalwar.org/papers/expmech.pdf). This means we can relax the assumption of having prior knowledge of the valuation profiles.
+# Prior-Free One-Shot Auctions via Differential Privacy
+Preprint: [Towards Prior-Free Approximately Truthful One-Shot Auction Learning via Differential Privacy](https://arxiv.org/abs/2104.00159).
 
+This is a fork of [Optimal Auctions through Deep Learning](https://github.com/saisrivatsan/deep-opt-auctions) (https://arxiv.org/pdf/1706.03459.pdf), using [TensorFlow Privacy](https://github.com/tensorflow/privacy/) to make the RegretNet approach Differentially Private, resulting in Approximate Truthfulness and Collusion Resistance in the sense of [Mechanism Design via Differential Privacy](http://kunaltalwar.org/papers/expmech.pdf). This means we can relax the assumption of having prior knowledge of the valuation profiles. 
 Only a single report is taken from each agent. We perform one-shot learning on these to learn an auction and plug in those same reports to calculate Revenue, Regret and Welfare.
 
 Since the potential to outperform a truthful report in the learned mechanism, by misreporting during the training, should be bounded, the incentive to misreport would also be bounded. Thus, the mechanism learner should be approximately truthful.
